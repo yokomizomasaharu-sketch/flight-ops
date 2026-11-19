@@ -78,6 +78,7 @@ def haneda():
                          f.get("area_name") or "", f.get("area_name") or "", nos,
                          (f.get("terminal") or {}).get("terminal") or "", gate,
                          (f.get("status") or {}).get("text") or ""])
+        rows.sort(key=lambda r: r[0] or "")
         boards[key] = rows
         log("HND %s: %d" % (key, len(rows)))
     return {"name": "羽田", "src": "羽田空港旅客ターミナル公式",
