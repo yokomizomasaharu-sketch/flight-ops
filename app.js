@@ -45,6 +45,12 @@
   }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
+  // 便名の先頭ゼロを整える（成田の "MM0559" → "MM559"）
+  function cleanFlt(s) {
+    return String(s || '').split(/\s+/).map(function (t) {
+      return t.replace(/^([A-Z0-9]{2})0+(\d)/, '$1$2');
+    }).join(' ');
+  }
   function toast(msg) {
     var t = el('div', 'toast', esc(msg));
     document.body.appendChild(t);
@@ -295,7 +301,7 @@
           '<div class="times"><div class="t-sched">' + esc(r[0]) + '</div>' +
           (r[1] ? '<div class="t-chg">' + esc(r[1]) + '</div>' : '') + '</div>' +
           '<div><div class="dest">' + esc(r[3] || r[2]) + '</div>' +
-          '<div class="fltno">' + esc(r[4]) + '</div></div>' +
+          '<div class="fltno">' + esc(cleanFlt(r[4])) + '</div></div>' +
           '<div class="right">' +
             '<span class="gate' + (r[6] ? '' : ' none') + '">' + (r[6] ? esc(r[6]) : '—') + '</span>' +
             (r[5] ? '<span class="term">' + esc(r[5]) + '</span>' : '') +
@@ -324,7 +330,7 @@
     if (!r) return;
     var iata = state.airport;
     var air = state.board.airports[iata];
-    var flt = (r[4] || '').split(/\s+/)[0] || '';
+    var flt = cleanFlt((r[4] || '').split(/\s+/)[0] || '');
     var st = r[7] || '';
     var dirLabel = state.dir === 'dep' ? '出発' : '到着';
     var other = state.dir === 'dep' ? '到着' : '出発';
@@ -338,7 +344,7 @@
         '<dt>ゲート</dt><dd>' + (r[6] ? esc(r[6]) : '—（未確定）') + '</dd>' +
         '<dt>ターミナル</dt><dd>' + (r[5] ? esc(r[5]) : '—') + '</dd>' +
         '<dt>ステータス</dt><dd>' + (st ? '<span class="st ' + statusClass(st) + '">' + esc(st) + '</span>' : '—') + '</dd>' +
-        '<dt>便名</dt><dd class="mono">' + esc(r[4] || '—') + '</dd>' +
+        '<dt>便名</dt><dd class="mono">' + esc(cleanFlt(r[4]) || '—') + '</dd>' +
       '</div>' +
       '<div class="linkgrid">' +
         (flt ? '<a class="linkbtn" href="' + U.fr24Flight(flt) + '" target="_blank" rel="noopener"><b>Flightradar24 便</b><span>使用機材・現在位置・履歴</span></a>' : '') +
@@ -590,7 +596,7 @@
         var dir = k.indexOf('_dep') > 0 ? 'dep' : 'arr';
         air.boards[k].forEach(function (r) {
           if ((r[4] || '').toUpperCase().indexOf(qq) >= 0) {
-            out.push({ iata: iata, dir: dir, time: r[0], dest: r[3] || r[2], gate: r[6], status: r[7], scope: k.indexOf('int') === 0 ? 'int' : 'dom' });
+            out.push({ iata: iata, dir: dir, time: r[0], dest: r[3] || r[2], gate: r[6], status: r[7], flt: cleanFlt(r[4]), scope: k.indexOf('int') === 0 ? 'int' : 'dom' });
           }
         });
       });
