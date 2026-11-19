@@ -157,7 +157,16 @@ LINK_ONLY = {
 def main():
     out = {"generatedAt": datetime.now(timezone.utc).isoformat(), "jst": STAMP, "date": DATE,
            "airports": {}, "failed": {}, "linkOnly": LINK_ONLY}
-    jobs = {"HND": haneda, "NRT": narita, "FUK": fukuoka}
+    def retry(fn, n=2):
+        last = None
+        for i in range(n):
+            try:
+                return fn()
+            except Exception as e:  # 一時的な失敗は1回だけ再試行
+                last = e
+        raise last
+
+    jobs = {"HND": lambda: retry(haneda), "NRT": lambda: retry(narita), "FUK": lambda: retry(fukuoka)}
     with ThreadPoolExecutor(max_workers=3) as ex:
         futs = {c: ex.submit(fn) for c, fn in jobs.items()}
         for c, fu in futs.items():
