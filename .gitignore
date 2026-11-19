@@ -1,3 +1,4 @@
 probe/
 out/
 workflow-snapshot.yml
+.github/
