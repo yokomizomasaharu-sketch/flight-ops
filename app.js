@@ -181,6 +181,7 @@
       var live = state.board && state.board.airports && state.board.airports[iata];
       var b = el('button', 'chip' + (iata === state.airport ? ' on' : ''),
         '<b>' + esc(iata) + '</b>' + esc(aptName(iata)) + (live ? ' ●' : ''));
+      b.setAttribute('data-iata', iata);
       b.onclick = function () { setAirport(iata); };
       wrap.appendChild(b);
     });
