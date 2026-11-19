@@ -6,7 +6,7 @@ name: board snapshot
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '5,15,25,35,45,55 * * * *'
   workflow_dispatch: {}
 
 permissions:
