@@ -1,0 +1,26 @@
+{
+  "name": "FLIGHT OPS 機材運用・発着ボード",
+  "short_name": "FLIGHT OPS",
+  "description": "航空機の機材運用・発着時刻・ゲートを確認するフライトオペレーションボード（個人情報なし）",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#070d18",
+  "theme_color": "#070d18",
+  "categories": ["travel", "productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "羽田の発着", "url": "./#HND", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "関空の発着", "url": "./#KIX", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "機材運用", "url": "./?tab=aircraft", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

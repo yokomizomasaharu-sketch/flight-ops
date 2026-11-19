@@ -1,0 +1,330 @@
+/* ============================================================
+   FLIGHT OPS  —  航空機材運用・発着ボード
+   390px 幅の iPhone を基準に設計したダークテーマの OCC 風 UI
+   ============================================================ */
+/* 自前ホストの等幅フォント（JetBrains Mono / SIL Open Font License 1.1）
+   iPhone では SF Mono が優先されます。 */
+@font-face {
+  font-family: "FLSans";
+  src: url("fonts/inter.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-00FF, U+2000-206F;
+}
+@font-face {
+  font-family: "FLMono";
+  src: url("fonts/jetbrainsmono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-00FF, U+2000-206F, U+2190-21FF;
+}
+
+:root {
+  --bg: #070d18;
+  --bg2: #0b1424;
+  --card: #101c30;
+  --card2: #16243c;
+  --line: #1e3050;
+  --txt: #e8f1ff;
+  --dim: #8ba3c4;
+  --dim2: #5f7595;
+  --cyan: #35e0f5;
+  --cyan-d: #0e7c8c;
+  --amber: #ffc44d;
+  --red: #ff6272;
+  --green: #4ad991;
+  --violet: #9b8cff;
+  --mono: "FLMono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Liberation Mono", Consolas, monospace;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  background:
+    radial-gradient(120% 60% at 50% -10%, #12314a 0%, rgba(7,13,24,0) 60%),
+    var(--bg);
+  color: var(--txt);
+  font-family: "FLSans", -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  min-height: 100vh;
+  padding-bottom: calc(66px + var(--safe-b));
+  overscroll-behavior-y: none;
+}
+button, input, select { font-family: inherit; color: inherit; }
+button { border: 0; background: none; cursor: pointer; }
+a { color: var(--cyan); text-decoration: none; }
+
+/* ---------- 共通 ---------- */
+.hidden { display: none !important; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em;
+  border: 1px solid var(--line); color: var(--dim);
+  background: #0d1728;
+}
+.pill.live { color: #052b2f; background: var(--cyan); border-color: var(--cyan); }
+.pill.live .dot { width: 6px; height: 6px; border-radius: 50%; background: #06333a; animation: blink 1.6s infinite; }
+.pill.warn { color: #2b1a00; background: var(--amber); border-color: var(--amber); }
+.pill.link { color: var(--violet); border-color: #3b3768; background: #151334; }
+@keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+
+/* ---------- ヘッダ ---------- */
+header.top {
+  position: sticky; top: 0; z-index: 30;
+  padding: calc(var(--safe-t) + 8px) 14px 8px;
+  background: linear-gradient(180deg, rgba(7,13,24,.98) 60%, rgba(7,13,24,.86) 100%);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.top-row { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.brand svg { width: 22px; height: 22px; flex: none; }
+.brand .t1 {
+  font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: .16em;
+  background: linear-gradient(90deg, #fff, var(--cyan));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  white-space: nowrap;
+}
+.brand .t2 { font-size: 9.5px; color: var(--dim2); letter-spacing: .06em; margin-top: -2px; white-space: nowrap; }
+.icon-btn {
+  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  border: 1px solid var(--line); background: #0d1728; color: var(--dim);
+}
+.icon-btn:active { background: var(--card2); }
+.icon-btn svg { width: 17px; height: 17px; }
+.top-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; overflow: hidden; }
+.top-meta .clock { font-family: var(--mono); font-size: 11px; color: var(--dim); }
+
+/* ---------- タブ ---------- */
+.view { display: none; padding: 12px 12px 24px; }
+.view.active { display: block; }
+nav.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  padding: 6px 8px calc(6px + var(--safe-b));
+  background: rgba(9,16,28,.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+}
+nav.tabbar button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 5px 0; border-radius: 12px; color: var(--dim2);
+  font-size: 10px; font-weight: 700; letter-spacing: .02em;
+}
+nav.tabbar button svg { width: 21px; height: 21px; }
+nav.tabbar button.on { color: var(--cyan); background: rgba(53,224,245,.08); }
+
+/* ---------- 空港セレクタ ---------- */
+.chiprow {
+  display: flex; gap: 7px; overflow-x: auto; padding: 2px 2px 8px;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.chiprow::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none; display: flex; flex-direction: column; align-items: center;
+  min-width: 58px; padding: 6px 10px; border-radius: 12px;
+  border: 1px solid var(--line); background: #0d1728; color: var(--dim);
+  font-size: 10px; line-height: 1.2;
+}
+.chip b { font-family: var(--mono); font-size: 14px; letter-spacing: .06em; color: var(--txt); }
+.chip.on { background: rgba(53,224,245,.12); border-color: var(--cyan); color: var(--cyan); }
+.chip.on b { color: var(--cyan); }
+.chip.add { justify-content: center; min-width: 44px; font-size: 18px; color: var(--dim2); }
+
+/* ---------- 空港ヘッダ ---------- */
+.apt-head {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: 16px;
+  background: linear-gradient(135deg, #12253d, #0c1729 65%);
+  border: 1px solid var(--line);
+  position: relative; overflow: hidden;
+}
+.apt-head:after {
+  content: ""; position: absolute; inset: auto -30px -40px auto; width: 150px; height: 150px;
+  background: radial-gradient(circle, rgba(53,224,245,.18), transparent 65%);
+}
+.apt-code { font-family: var(--mono); font-size: 30px; font-weight: 700; letter-spacing: .08em; line-height: 1; }
+.apt-name { font-size: 12.5px; color: var(--txt); font-weight: 700; margin-top: 3px; }
+.apt-sub { font-size: 10px; color: var(--dim2); margin-top: 3px; }
+.apt-actions { margin-left: auto; display: flex; gap: 6px; }
+
+/* ---------- セグメント ---------- */
+.seg { display: flex; gap: 4px; padding: 3px; background: #0b1424; border: 1px solid var(--line); border-radius: 11px; }
+.seg button {
+  flex: 1; padding: 7px 4px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--dim);
+}
+.seg button.on { background: var(--card2); color: var(--txt); box-shadow: 0 1px 0 rgba(255,255,255,.05) inset; }
+.seg button.on.dep { color: var(--cyan); }
+.seg button.on.arr { color: var(--green); }
+.row2 { display: flex; gap: 8px; margin-top: 10px; }
+.row2 .seg { flex: 1; }
+
+/* ---------- 検索 ---------- */
+.searchbox {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  padding: 9px 12px; border-radius: 12px; background: #0b1424; border: 1px solid var(--line);
+}
+.searchbox svg { width: 15px; height: 15px; color: var(--dim2); flex: none; }
+.searchbox input { flex: 1; border: 0; background: none; outline: none; font-size: 14px; min-width: 0; }
+.searchbox input::placeholder { color: var(--dim2); }
+
+/* ---------- ボード ---------- */
+.board {
+  margin-top: 10px; border-radius: 16px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--card);
+}
+.board-head {
+  display: grid; grid-template-columns: 56px 1fr 54px; gap: 8px;
+  padding: 7px 12px; background: #0a1322; border-bottom: 1px solid var(--line);
+  font-size: 9.5px; letter-spacing: .1em; color: var(--dim2); font-weight: 700;
+}
+.fl {
+  display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; align-items: center;
+  padding: 9px 12px; border-bottom: 1px solid #16233a; text-align: left; width: 100%;
+}
+.fl:last-child { border-bottom: 0; }
+.fl:active { background: #16243a; }
+.fl .times { font-family: var(--mono); }
+.fl .t-sched { font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
+.fl .t-chg { font-size: 10.5px; color: var(--amber); font-weight: 700; margin-top: 1px; }
+.fl .t-chg.done { color: var(--dim2); }
+.fl .dest { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.fl .fltno { font-family: var(--mono); font-size: 10.5px; color: var(--dim); margin-top: 1px; letter-spacing: .02em; }
+.fl .right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.gate {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--cyan);
+  padding: 2px 8px; border-radius: 7px; border: 1px solid var(--cyan-d); background: rgba(53,224,245,.08);
+  white-space: nowrap;
+}
+.gate.none { color: var(--dim2); border-color: var(--line); background: none; }
+.term { font-size: 9px; color: var(--dim2); letter-spacing: .06em; }
+.st { font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+.st.s-live { background: rgba(53,224,245,.14); color: var(--cyan); }
+.st.s-delay { background: rgba(255,196,77,.16); color: var(--amber); }
+.st.s-cancel { background: rgba(255,98,114,.16); color: var(--red); }
+.st.s-done { background: #17243a; color: var(--dim2); }
+.st.s-ok { background: rgba(74,217,145,.14); color: var(--green); }
+.st.s-none { display: none; }
+
+.empty { padding: 26px 16px; text-align: center; color: var(--dim2); font-size: 12.5px; }
+
+/* リンクのみの空港 */
+.linkcard { margin-top: 10px; padding: 14px; border-radius: 16px; border: 1px dashed #2a3f60; background: #0a1322; }
+.linkcard h4 { margin: 0 0 6px; font-size: 12.5px; }
+.linkcard p { margin: 0 0 10px; font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+.btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 11px 10px; border-radius: 12px; font-size: 12px; font-weight: 700;
+  border: 1px solid var(--line); background: #12203a; color: var(--txt);
+}
+.btn.primary { background: linear-gradient(135deg, #0e6b7a, #0b4f63); border-color: #1a8ba0; color: #eaffff; }
+.btn.violet { background: #1a1740; border-color: #3b3768; color: #cfc7ff; }
+.btn.wide { grid-column: 1 / -1; }
+.btn:active { transform: scale(.985); }
+
+/* ---------- 機材運用 ---------- */
+.card { border-radius: 16px; border: 1px solid var(--line); background: var(--card); padding: 13px 14px; }
+.card + .card { margin-top: 10px; }
+.card h3 { margin: 0 0 4px; font-size: 11px; letter-spacing: .1em; color: var(--dim2); font-weight: 700; }
+.reg-input { display: flex; gap: 8px; margin-top: 10px; }
+.reg-input input {
+  flex: 1; min-width: 0; padding: 12px 14px; border-radius: 12px;
+  background: #0b1424; border: 1px solid var(--line); outline: none;
+  font-family: var(--mono); font-size: 16px; letter-spacing: .1em; text-transform: uppercase;
+}
+.reg-input input:focus { border-color: var(--cyan-d); }
+.reg-input button {
+  padding: 0 16px; border-radius: 12px; font-weight: 700; font-size: 13px;
+  background: linear-gradient(135deg, #0e6b7a, #0b4f63); border: 1px solid #1a8ba0; color: #eaffff;
+}
+.kv { display: grid; grid-template-columns: 82px 1fr; gap: 5px 10px; font-size: 12.5px; margin-top: 8px; }
+.kv dt { color: var(--dim2); font-size: 11px; }
+.kv dd { margin: 0; font-weight: 600; word-break: break-word; }
+.favrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.fav {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 9px;
+  background: #0d1728; border: 1px solid var(--line); font-family: var(--mono); font-size: 12px;
+}
+.fav span.x { color: var(--dim2); font-size: 13px; padding: 0 1px; }
+.linkgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.linkbtn {
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 11px; border-radius: 12px;
+  border: 1px solid var(--line); background: #0d1728; text-align: left;
+}
+.linkbtn b { font-size: 12px; }
+.linkbtn span { font-size: 9.5px; color: var(--dim2); }
+
+/* ---------- リンク集 ---------- */
+.sec-title {
+  display: flex; align-items: center; gap: 7px; margin: 16px 2px 8px;
+  font-size: 11px; letter-spacing: .12em; color: var(--dim2); font-weight: 700;
+}
+.sec-title:before { content: ""; width: 3px; height: 11px; background: var(--cyan); border-radius: 2px; }
+.lrow {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; border-bottom: 1px solid #16233a; background: var(--card);
+}
+.lrow:first-of-type { border-radius: 14px 14px 0 0; }
+.lrow:last-of-type { border-radius: 0 0 14px 14px; border-bottom: 0; }
+.lrow:active { background: #16243a; }
+.lrow .code {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--cyan);
+  min-width: 34px; letter-spacing: .04em;
+}
+.lrow .nm { flex: 1; font-size: 13px; font-weight: 600; min-width: 0; }
+.lrow .nm small { display: block; font-size: 10px; color: var(--dim2); font-weight: 400; }
+.lrow .go { color: var(--dim2); font-size: 12px; }
+
+/* ---------- シート ---------- */
+.sheet-wrap {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end;
+  background: rgba(4,8,15,.66); backdrop-filter: blur(3px);
+}
+.sheet {
+  width: 100%; max-height: 88vh; overflow-y: auto;
+  background: var(--bg2); border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--line);
+  padding: 8px 16px calc(20px + var(--safe-b));
+  animation: up .22s ease-out;
+}
+@keyframes up { from { transform: translateY(30px); opacity: .7 } to { transform: none; opacity: 1 } }
+.grab { width: 38px; height: 4px; border-radius: 99px; background: #2b4066; margin: 6px auto 12px; }
+.sheet h2 { margin: 0; font-size: 17px; display: flex; align-items: baseline; gap: 8px; }
+.sheet h2 .c { font-family: var(--mono); color: var(--cyan); font-size: 15px; }
+.sheet .sub { color: var(--dim); font-size: 11.5px; margin-top: 3px; }
+.sheet .bigtime { font-family: var(--mono); font-size: 30px; font-weight: 700; margin-top: 10px; letter-spacing: -.02em; }
+.sheet .bigtime s::before { content: "→ "; } .sheet .bigtime s { color: var(--amber); font-size: 15px; text-decoration: none; margin-left: 8px; font-weight: 600; }
+
+/* 検索モーダル */
+.modal { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: flex; flex-direction: column; }
+.modal .mhead { padding: calc(var(--safe-t) + 10px) 14px 10px; border-bottom: 1px solid var(--line); }
+.modal .mlist { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.modal .mlist button {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 14px; border-bottom: 1px solid #14203300;
+}
+.modal .mlist button:active { background: #16243a; }
+.modal .mlist .iata { font-family: var(--mono); font-weight: 700; color: var(--cyan); min-width: 40px; font-size: 13px; }
+.modal .mlist .an { flex: 1; font-size: 13px; }
+.modal .mlist .an small { display: block; color: var(--dim2); font-size: 10.5px; }
+.modal .note { padding: 10px 14px; color: var(--dim2); font-size: 11px; }
+
+.foot-note { margin: 18px 4px 6px; font-size: 10.5px; color: var(--dim2); line-height: 1.6; }
+.foot-note b { color: var(--dim); }
+.spacer { height: 6px; }
+.toast {
+  position: fixed; left: 50%; bottom: calc(84px + var(--safe-b)); transform: translateX(-50%);
+  background: #1b2b46; border: 1px solid var(--line); color: var(--txt);
+  padding: 8px 14px; border-radius: 999px; font-size: 12px; z-index: 90;
+  box-shadow: 0 8px 24px rgba(0,0,0,.45); animation: up .18s ease-out;
+}
+.skel { height: 46px; background: linear-gradient(90deg,#101c30,#16243c,#101c30); background-size: 200% 100%; animation: sh 1.1s infinite; border-bottom: 1px solid #16233a; }
+@keyframes sh { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
