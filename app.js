@@ -171,7 +171,10 @@
       return;
     }
     b.textContent = 'LIVE ' + stampText();
-    setLive(state.dataState === 'stale' ? 'stale' : 'ok', state.dataState === 'stale' ? 'CACHED' : 'AUTO');
+    var ageMin = state.board.generatedAt ? (Date.now() - Date.parse(state.board.generatedAt)) / 60000 : 0;
+    if (state.dataState === 'stale') setLive('stale', 'CACHED');
+    else if (ageMin > 45) setLive('stale', 'STALE');
+    else setLive('ok', 'AUTO');
   }
 
   /* ---------------- 空港チップ ---------------- */
@@ -325,6 +328,8 @@
 
     note.innerHTML = '<b>' + esc(air.src) + '</b> の公開データを10分ごとに取得（' + esc(air.asOf || '') + '）。' +
       'ゲートは変更されることがあります。当日の最新は公式サイトでご確認ください。' +
+      (state.board.generatedAt && (Date.now() - Date.parse(state.board.generatedAt)) > 45 * 60000
+        ? ' <b style="color:#ffc44d">※最終取得から時間が経っています（自動更新の遅延）。</b>' : '') +
       (state.dataState === 'stale' ? ' ※現在オフライン保存分を表示中。' : '');
   }
 

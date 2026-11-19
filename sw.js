@@ -2,7 +2,7 @@
    ・アプリ本体（HTML/CSS/JS/アイコン）はキャッシュ優先でオフラインでも起動
    ・運航データ（boards.json）はネットワーク優先（失敗時はキャッシュ）
    バージョンを上げると古いキャッシュは破棄されます。 */
-var VERSION = 'flightops-v1.0.3';
+var VERSION = 'flightops-v1.0.4';
 var SHELL = [
   './',
   './index.html',
