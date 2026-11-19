@@ -1,0 +1,118 @@
+{
+ "hnd": {
+  "url": "https://www.tokyo-haneda.com/flight/flightInfo_dms.html",
+  "title": "フライト検索 (国内線) | フライト | 羽田空港旅客ターミナル",
+  "json": [
+   {
+    "url": "https://data.wovn.io/domain/options/n__Z4H?v=c1ad8075&host=tokyo-haneda.com",
+    "status": 200,
+    "ct": "application/json; charset=utf-8",
+    "len": 24634,
+    "cors": "*",
+    "snippet": "{\"audit_strategy\":\"square\",\"auto_hide_widget\":false,\"cookie_domain_preference\":null,\"custom_colors\":null,\"embedded_widget\":false,\"embedded_widget_custom_css\":null,\"embedded_widget_insertion_behavior\":null,\"embedded_widget_selector\":null,\"force_reload\":false,\"generic_lang_word\":\"Language\",\"hide_logo\""
+   },
+   {
+    "url": "https://data.wovn.io/js_data/json/1/n__Z4H/?v=c1ad8075&u=https%3A%2F%2Ftokyo-haneda.com%2Fflight%2Fdms_search.html&page_status_code=200",
+    "status": 200,
+    "ct": "application/json; charset=utf-8",
+    "len": 86523,
+    "cors": "*",
+    "snippet": "{\"id\":\"68b4ebcd3fb8d050fcecbb0f\",\"name\":null,\"page_id\":\"68b4ebcd3fb8d050fcecbb0f\",\"language\":\"ja\",\"source_langs\":[{\"name\":\"日本語\",\"tag\":{\"language\":\"ja\"},\"code\":\"ja\",\"en\":\"Japanese\",\"use_word_boundary\":false,\"script_direction\":\"ltr\",\"unit_type\":\"character\",\"candidates\":[\"ja\"]}],\"convert_langs\":["
+   },
+   {
+    "url": "https://tokyo-haneda.com/site_resource/flight/data/dms/company_list_search.json?_=1795122756356",
+    "status": 200,
+    "ct": "application/json",
+    "len": 4829,
+    "cors": null,
+    "snippet": "{\r\n  \"ja\": {\r\n    \"items\": [\r\n      {\r\n        \"text\": \"日本航空\",\r\n        \"value\": \"JAL\",\r\n        \"value02\": \"JL\",\r\n        \"url\": \"https:\\/\\/www.jal.co.jp\\/jp\\/ja\\/\"\r\n      },\r\n      {\r\n        \"text\": \"ANA\",\r\n        \"value\": \"ANA\",\r\n        \"value02\": \"NH\",\r\n        \"url\": \"https:\\/\\/www.a"
+   },
+   {
+    "url": "https://tokyo-haneda.com/app_resource/flight/flightStatus/flight_status.json?_=1795122756358",
+    "status": 200,
+    "ct": "application/json",
+    "len": 26148,
+    "cors": null,
+    "snippet": "{\"gettingAt\":\"2026/11/20 06:09:10\",\"isOverLimit\":false,\"modalPattern\":null,\"domesticTotalCount\":13,\"internationalTotalCount\":5,\"domesticFlights\":{\"departure\":{\"regions\":[{\"regionName\":\"北海道\",\"totalCount\":3,\"locations\":[{\"cityName\":\"函館\",\"cityCode\":\"HKD\",\"status\":{\"delayedFlights\":0,\"cancelle"
+   },
+   {
+    "url": "https://tokyo-haneda.com/site_resource/flight/data/dms/city_list_search.json?_=1795122756354",
+    "status": 200,
+    "ct": "application/json",
+    "len": 34843,
+    "cors": null,
+    "snippet": "{\r\n  \"ja\": {\r\n    \"items\": [\r\n      {\r\n        \"text\": \"北海道\",\r\n        \"children\": [\r\n          {\r\n            \"text\": \"函館\",\r\n            \"value\": \"HKD\",\r\n            \"airportCode\": \"HKD\"\r\n          },\r\n          {\r\n            \"text\": \"釧路\",\r\n            \"value\": \"KUH\",\r\n            \"a"
+   },
+   {
+    "url": "https://tokyo-haneda.com/site_resource/flight/data/int/city_list_search.json?_=1795122756355",
+    "status": 200,
+    "ct": "application/json",
+    "len": 51447,
+    "cors": null,
+    "snippet": "{\r\n  \"ja\": {\r\n    \"items\": [\r\n      {\r\n        \"text\": \"東アジア方面\",\r\n        \"children\": [\r\n          {\r\n            \"text\": \"ソウル（金浦）\",\r\n            \"value\": \"GMP\",\r\n            \"airportCode\": \"GMP\",\r\n            \"timeDiff\": {\r\n              \"hour\": 0,\r\n              \"gmt\": \"G"
+   },
+   {
+    "url": "https://consentcdn.cookiebot.com/consentconfig/2ff5b4b0-dc12-438c-a4f7-9468e6780161/settings.json",
+    "status": 200,
+    "ct": "application/json",
+    "len": 646,
+    "cors": "*",
+    "snippet": "{\"widget\":{\"enabled\":false,\"position\":{\"position\":\"bottom-left\",\"distanceVerticalPx\":10,\"distanceHorizontalPx\":10},\"theme\":{\"closed\":{\"backgroundColor\":\"#141414\",\"foregroundColor\":\"#FFFFFF\"},\"opened\":{\"backgroundColor\":\"#FFFFFF\",\"foregroundColor\":\"#141414\",\"highlightColor\":\"#1032CF\",\"shadeColor\":\"#D"
+   },
+   {
+    "url": "https://tokyo-haneda.com/site_resource/flight/data/int/company_list_search.json?_=1795122756357",
+    "status": 200,
+    "ct": "application/json",
+    "len": 57259,
+    "cors": null,
+    "snippet": "{\r\n  \"ja\": {\r\n    \"items\": [\r\n      {\r\n        \"text\": \"ANA\",\r\n        \"value\": \"ANA\",\r\n        \"value02\": \"NH\",\r\n        \"url\": \"https:\\/\\/www.ana.co.jp\\/\"\r\n      },\r\n      {\r\n        \"text\": \"日本航空\",\r\n        \"value\": \"JAL\",\r\n        \"value02\": \"JL\",\r\n        \"url\": \"https:\\/\\/www.jal.co.jp"
+   }
+  ]
+ },
+ "fuk": {
+  "url": "https://www.fukuoka-airport.jp/flight/",
+  "title": "フライト情報検索 | 福岡空港 FUKUOKA AIRPORT",
+  "json": [
+   {
+    "url": "https://www.fukuoka-airport.jp/api/emergency/data.json",
+    "status": 200,
+    "ct": "application/json",
+    "len": 775,
+    "cors": null,
+    "snippet": "{\"items\":[{\"lang\":\"ja\",\"id\":\"0a03e260-9c13-48ce-a461-bd7788148261\",\"important\":99,\"title\":\"\\u56fd\\u5185\\u7dda\\u8907\\u5408\\u65bd\\u8a2d\\u6574\\u5099\\u5de5\\u4e8b\\u306b\\u4f34\\u3046\\u52d5\\u7dda\\u5909\\u66f4\\u306b\\u3064\\u3044\\u3066\",\"category\":2,\"url\":\"https:\\/\\/www.fukuoka-airport.jp\\/information\\/esc-clos"
+   },
+   {
+    "url": "https://www.fukuoka-airport.jp/api/map/util.json",
+    "status": 200,
+    "ct": "application/json",
+    "len": 12094,
+    "cors": null,
+    "snippet": "{\"checkin\":[{\"id\":\"i_c_counter13\",\"immigration_distance\":\"\",\"inspection\":\"international\",\"north_distance\":\"\",\"restricted\":\"unrestricted\",\"south_distance\":\"\",\"terminal_id\":\"int_3f\",\"title\":\"チェックインカウンター：T\"},{\"id\":\"charging_area38\",\"immigration_distance\":\"\",\"inspection\":\"\",\"nort"
+   },
+   {
+    "url": "https://www.fukuoka-airport.jp/api/flight/airline/data.json",
+    "status": 200,
+    "ct": "application/json",
+    "len": 20779,
+    "cors": null,
+    "snippet": "{\"items\":[{\"checkin\":\"1\",\"code\":\"MH\",\"created\":\"2026-07-28 10:29:45\",\"dom_access\":\"\",\"dom_location\":\"\",\"dom_tel\":\"\",\"end_date\":\"\",\"id\":\"10684\",\"image\":\"/uploads/2026/07/MABLogoColor.jpg\",\"int_code\":\"MH\",\"int_tel\":\"03-4477-4938\",\"kana\":\"まれーしあこうくう\",\"link\":\"/flight/airline/mh.html\",\"m"
+   },
+   {
+    "url": "https://www.fukuoka-airport.jp/api/service/main_category.json?_=1795122766598",
+    "status": 200,
+    "ct": "application/json",
+    "len": 1408,
+    "cors": null,
+    "snippet": "{\"main_categories\":[{\"id\":\"10732\",\"sequence\":\"1\",\"sub_category\":\"10721,10733\",\"title\":\"Tax Refund\"},{\"id\":\"2798\",\"sequence\":\"2\",\"sub_category\":\"2799,3193,3188\",\"title\":\"銀行・保険 ・外貨両替\"},{\"id\":\"3419\",\"sequence\":\"2\",\"sub_category\":\"3214,8590,3209,3204,3199\",\"title\":\"手荷物・宅配"
+   },
+   {
+    "url": "https://www.fukuoka-airport.jp/api/flight_schedule/flight_schedule.json",
+    "status": 200,
+    "ct": "application/json",
+    "len": 693149,
+    "cors": null,
+    "snippet": "{\"FIS-2026-11-20-2026-11-20-A-AAR-0132\":{\"arraykey\":\"FIS-2026-11-20-2026-11-20-A-AAR-0132\",\"sharekey\":\"FIS-2026-11-20-2026-11-20-A-AAR-0132\",\"flt_ymd\":\"2026-11-20\",\"deparv_div\":\"A\",\"airline_cd\":\"AAR\",\"airline_2cd\":\"OZ\",\"flt_num_no\":\"0132\",\"flt_sfx\":\"\",\"appointed_time\":\"0735\",\"intdom_div\":\"I\",\"ter_di"
+   }
+  ]
+ }
+}
