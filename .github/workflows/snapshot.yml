@@ -1,0 +1,41 @@
+name: board snapshot
+
+# 羽田・成田・福岡の公式サイトから当日の運航データを取得し、
+# `data` ブランチに boards.json として公開します（アプリは raw.githubusercontent.com から読む）。
+# 10分ごと。個人情報は一切扱いません。
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: board-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch official boards
+        run: python3 scripts/fetch_boards.py
+
+      - name: Publish to data branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          mkdir -p /tmp/pub && cp out/boards.json /tmp/pub/boards.json
+          cd /tmp/pub
+          git init -q -b data
+          git config user.name "flight-ops snapshot"
+          git config user.email "actions@users.noreply.github.com"
+          git add boards.json
+          git commit -qm "snapshot $(date -u +%FT%TZ)"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data
