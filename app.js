@@ -10,7 +10,8 @@
   var LS = {
     apts: 'fo.favAirports',
     crew: 'fo.favAircraft',
-    board: 'fo.lastBoard'
+    board: 'fo.lastBoard',
+    apt: 'fo.lastAirport'
   };
   var DEFAULT_APTS = ['HND', 'KIX', 'ITM', 'NRT', 'FUK', 'CTS', 'OKA', 'NGO'];
 
@@ -193,6 +194,7 @@
 
   function setAirport(iata) {
     state.airport = iata;
+    save(LS.apt, iata);
     state.filter = '';
     var f = $('#fltFilter'); if (f) f.value = '';
     renderChips(); renderBoardHead(); renderBoard(); renderStamp();
@@ -731,7 +733,9 @@
 
     $('#btnRefresh').onclick = function () { loadBoard(true); };
 
-    // 起動
+    // 起動（前回の空港を復元）
+    var last = load(LS.apt, '');
+    if (last && APT_BY_IATA[last]) state.airport = last;
     renderChips();
     renderBoardHead();
     loadBoard(false);
