@@ -593,7 +593,7 @@
     if (/^cancel/i.test(s)) return { text: '欠航', cls: 's-cancel' };
     if (/^divert/i.test(s)) return { text: '代替着', cls: 's-cancel' };
     if (/^delayed/i.test(s)) return { text: '遅延', cls: 's-delay' };
-    if (/^estimated/i.test(s)) return { text: '予定', cls: 's-live' };
+    if (/^estimated/i.test(s)) return { text: '推定', cls: 's-live' };
     if (/^scheduled/i.test(s)) return { text: '定刻', cls: 's-ok' };
     if (!s) return { text: '—', cls: 's-none' };
     return { text: s.split(/[\s(]/)[0], cls: 's-live' };
