@@ -71,28 +71,32 @@
   <!-- ================= 機材運用 ================= -->
   <section id="view-aircraft" class="view">
     <div class="card">
-      <h3>機体記号（レジ番）/ 便名で検索</h3>
+      <h3>機体記号（レジ番）/ ICAO24 / 便名で検索</h3>
       <div class="reg-input">
-        <input id="acInput" placeholder="JA01XJ ・ NH985" autocapitalize="characters" autocomplete="off" spellcheck="false">
+        <input id="acInput" placeholder="JA01XJ ・ 8406E8 ・ NH985" autocapitalize="characters" autocomplete="off" spellcheck="false">
         <button id="acGo">検索</button>
       </div>
       <div class="favrow" id="acFavs"></div>
     </div>
 
+    <div id="acFavHist"></div>
+
     <div id="acResult"></div>
 
     <div class="card">
-      <h3>機材繰りの見方</h3>
+      <h3>見方</h3>
       <p class="sub" style="margin:0;color:var(--dim);font-size:11.5px;line-height:1.6">
-        レジ番を入れると <b>Flightradar24 の機体ページ</b>（その機体の当日の全フライト＝前便→当便→次便）と
-        <b>FlightAware の機体履歴</b>に 1 タップで飛べます。便名を入れると便ページ（使用機材・現在位置・遅延）と、
-        羽田／成田／福岡のボード横断結果を表示します。
+        レジ番を入れると <b>「これまでの飛行履歴」</b>（どこからどこへ飛んだか・便名・日時・状態）が
+        アプリ内に時系列で並びます。無料で取れるのは <b>直近7日・最大100便</b> までで、
+        それ以前は FR24 機体ページ（月別）と FlightAware へ 1 タップで飛べます。
+        便名を入れると、その便名を最近どの機材が飛んだかも分かります。
       </p>
     </div>
 
     <div class="foot-note">
-      機体のライブ位置（ADS-B）は、ブラウザから直接取得できる無料APIが CORS 制限で使えないため、
-      本アプリでは Flightradar24 / FlightAware / ADS-B Exchange への直結で対応しています。
+      飛行履歴は Flightradar24 の公開データ（直近7日・最大100便）を直接取得して表示しています。
+      7日より前の長期履歴は無料APIの範囲外のため、FR24 機体ページ／FlightAware への直結で対応します。
+      ライブ位置（ADS-B）はブラウザからの直接取得が CORS 制限で使えないため、ADS-B Exchange へ直結しています。
     </div>
   </section>
 

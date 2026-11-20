@@ -454,14 +454,17 @@
   function normReg(s) { return (s || '').toUpperCase().replace(/[^A-Z0-9-]/g, ''); }
 
   function parseQuery(v) {
-    var s = (v || '').trim().toUpperCase().replace(/\s+/g, '');
+    var s = (v || '').trim().toUpperCase().replace(/\s+/g, '').replace(/^0X/, '');
     if (!s) return null;
+    // ICAO24 hex（例 8406E8）: 先頭が数字の6桁16進はレジ番ではなく機体hexとして扱う
+    if (/^[0-9][0-9A-F]{5}$/.test(s)) return { type: 'hex', hex: s };
     var m = s.match(/^([A-Z0-9]{2})(\d{1,4})([A-Z]?)$/);
     if (m && window.FO_AIRLINE_ICAO[m[1]]) {
       return { type: 'flight', iata: m[1], num: m[2], suffix: m[3] || '', flight: m[1] + m[2] + (m[3] || ''), callsign: window.FO_AIRLINE_ICAO[m[1]] + m[2] };
     }
     if (/^[A-Z]{1,2}-?[A-Z0-9]{3,5}$/.test(s) && /\d/.test(s)) return { type: 'reg', reg: s };
     if (/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(s)) return { type: 'flight', flight: s, iata: s.slice(0, 2), num: s.slice(2) };
+    if (/^[0-9A-F]{6}$/.test(s)) return { type: 'hex', hex: s };
     return { type: 'unknown', raw: s };
   }
 
@@ -491,7 +494,362 @@
       };
       host.appendChild(b);
     });
-    if (!state.favCrew.length) host.innerHTML = '<span style="font-size:10.5px;color:var(--dim2)">よく見る機体・便を登録できます（下のボタンから）</span>';
+    if (!state.favCrew.length) host.innerHTML = '<span style="font-size:10.5px;color:var(--dim2)">よく見る機体・便を登録できます（履歴カードのボタンから）</span>';
+    renderFavHist();
+  }
+
+  /* ---------- 飛行履歴（Flightradar24 公開エンドポイント） ----------
+     ・レジ番/hex で「直近7日・最大100便」の運航履歴（出発地→到着地・便名・日時・状態）を取得
+     ・便名でも「その便名の最近の運航と使用機材」を取得
+     ・取得結果は localStorage に15分キャッシュ（お気に入り機体の履歴をすぐ開けるように）
+  ---------------------------------------------------------------- */
+  var FR24_LIST = 'https://api.flightradar24.com/common/v1/flight/list.json';
+  var HIST_TTL = 15 * 60 * 1000;
+  var HIST_LIMIT = 100;
+  var histBusy = {};
+
+  function histKey(k) { return 'fo.hist.v2.' + k; }
+  function histGet(k) {
+    var v = load(histKey(k), null);
+    return (v && v.list && v.list.length) ? v : null;
+  }
+  function histPut(k, list) {
+    try { save(histKey(k), { at: Date.now(), list: list.slice(0, HIST_LIMIT) }); } catch (e) { }
+  }
+
+  // UNIX秒 → JST の各部分
+  function jst(ts) {
+    if (!ts) return null;
+    var d = new Date(ts * 1000);
+    var j = new Date(d.getTime() + (d.getTimezoneOffset() + 540) * 60000);
+    return {
+      ymd: j.getFullYear() + '-' + pad(j.getMonth() + 1) + '-' + pad(j.getDate()),
+      md: (j.getMonth() + 1) + '/' + pad(j.getDate()),
+      hm: pad(j.getHours()) + ':' + pad(j.getMinutes()),
+      wd: ['日', '月', '火', '水', '木', '金', '土'][j.getDay()]
+    };
+  }
+  function fmtAt(ts) {
+    var p = ts ? jst(Math.floor(ts / 1000)) : null;
+    return p ? p.md + ' ' + p.hm : '—';
+  }
+
+  function fr24List(query, by) {
+    var id = by + ':' + query;
+    if (histBusy[id]) return Promise.reject(new Error('busy'));
+    histBusy[id] = 1;
+    var url = FR24_LIST + '?query=' + encodeURIComponent(query) + '&fetchBy=' + by + '&limit=' + HIST_LIMIT + '&page=1';
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { try { ctl.abort(); } catch (e) { } }, 12000) : null;
+    return fetch(url, { cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (j) {
+        var res = j && j.result && j.result.response;
+        if (!res) throw new Error('no data');
+        return res;
+      })
+      .then(function (res) {
+        if (timer) clearTimeout(timer);
+        delete histBusy[id];
+        return res;
+      }, function (e) {
+        if (timer) clearTimeout(timer);
+        delete histBusy[id];
+        throw e;
+      });
+  }
+
+  // FR24 の便配列 → アプリ用の軽い形（新しい順）
+  function normFlights(data) {
+    var out = [];
+    (data || []).forEach(function (f) {
+      var t = f.time || {}, ap = f.airport || {};
+      var s = t.scheduled || {}, r = t.real || {}, e2 = t.estimated || {};
+      var dep = s.departure || r.departure || e2.departure || 0;
+      var arr = s.arrival || r.arrival || e2.arrival || 0;
+      if (!dep && !arr) return;
+      // 6時間より先の「まだ飛んでいない便」は履歴から外す
+      if (dep > (Date.now() / 1000) + 6 * 3600) return;
+      var o = ap.origin, d = ap.destination;
+      out.push({
+        dep: dep, arr: arr, rdep: r.departure || 0, rarr: r.arrival || 0,
+        flt: (f.identification && f.identification.number && f.identification.number.default) || '',
+        o: (o && o.code && o.code.iata) || '',
+        dst: (d && d.code && d.code.iata) || '',
+        st: (f.status && f.status.text) || '',
+        reg: (f.aircraft && f.aircraft.registration) || ''
+      });
+    });
+    out.sort(function (a, b) { return (b.dep || b.arr) - (a.dep || a.arr); });
+    return out;
+  }
+
+  function stInfo(s) {
+    s = s || '';
+    if (/^landed/i.test(s)) return { text: '着陸', cls: 's-done' };
+    if (/^cancel/i.test(s)) return { text: '欠航', cls: 's-cancel' };
+    if (/^divert/i.test(s)) return { text: '代替着', cls: 's-cancel' };
+    if (/^delayed/i.test(s)) return { text: '遅延', cls: 's-delay' };
+    if (/^estimated/i.test(s)) return { text: '予定', cls: 's-live' };
+    if (/^scheduled/i.test(s)) return { text: '定刻', cls: 's-ok' };
+    if (!s) return { text: '—', cls: 's-none' };
+    return { text: s.split(/[\s(]/)[0], cls: 's-live' };
+  }
+
+  function histStats(list) {
+    var apts = {}, routes = {}, delays = [];
+    list.forEach(function (e) {
+      if (e.o) apts[e.o] = 1;
+      if (e.dst) apts[e.dst] = 1;
+      if (e.o && e.dst) {
+        var k = [e.o, e.dst].sort().join('=');
+        routes[k] = (routes[k] || 0) + 1;
+      }
+      if (/^landed/i.test(e.st) && e.rdep && e.dep) {
+        var m = Math.round((e.rdep - e.dep) / 60);
+        if (Math.abs(m) < 600) delays.push(m);
+      }
+    });
+    var rk = Object.keys(routes).sort(function (a, b) { return routes[b] - routes[a]; })
+      .slice(0, 4).map(function (k) {
+        var p = k.split('=');
+        return { r: p[0] + '⇄' + p[1], n: routes[k] };
+      });
+    var avg = delays.length ? Math.round(delays.reduce(function (a, b) { return a + b; }, 0) / delays.length) : null;
+    var newest = list.length ? jst(list[0].dep || list[0].arr) : null;
+    var oldest = list.length ? jst(list[list.length - 1].dep || list[list.length - 1].arr) : null;
+    return {
+      n: list.length,
+      apts: Object.keys(apts),
+      routes: rk,
+      avg: avg,
+      span: (oldest && newest) ? oldest.md + '〜' + newest.md : '—',
+      multi: {}
+    };
+  }
+
+  function histDayGroups(list, limit) {
+    var days = [], map = {};
+    list.slice(0, limit).forEach(function (e) {
+      var p = jst(e.dep || e.arr);
+      var k = p ? p.ymd : '?';
+      if (!map[k]) { map[k] = { md: p ? p.md : '—', wd: p ? p.wd : '', items: [] }; days.push(map[k]); }
+      map[k].items.push(e);
+    });
+    return days;
+  }
+
+  function histRowAircraft(e) {
+    var p = jst(e.dep || e.arr), q = jst(e.arr);
+    var st = stInfo(e.st);
+    var real = (e.rdep && e.dep && Math.abs(e.rdep - e.dep) >= 60 && !/^landed/i.test(e.st)) ? jst(e.rdep) : null;
+    return '<div class="tl-row">' +
+      '<div class="tl-t"><b>' + esc(p ? p.hm : '—') + '</b>' + (real ? '<s>' + esc(real.hm) + '</s>' : '') + '</div>' +
+      '<div class="tl-l"><i></i></div>' +
+      '<div class="tl-m">' +
+        '<div class="tl-r"><b class="mono ap">' + esc(e.o || '—') + '</b><span class="arw">→</span><b class="mono ap">' + esc(e.dst || '—') + '</b>' +
+          '<span class="st ' + st.cls + '">' + esc(st.text) + '</span></div>' +
+        '<div class="tl-s"><span class="mono fno">' + esc(e.flt || '—') + '</span> ・ ' + esc(aptName(e.o)) + '→' + esc(aptName(e.dst)) +
+          (q ? ' ・ ' + esc(q.hm) + '着' : '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function histRowFlight(e) {
+    var p = jst(e.dep || e.arr), q = jst(e.arr);
+    var st = stInfo(e.st);
+    return '<button class="tl-row tl-btn" data-reg="' + esc(e.reg) + '">' +
+      '<div class="tl-t"><b>' + esc(p ? p.hm : '—') + '</b></div>' +
+      '<div class="tl-l"><i></i></div>' +
+      '<div class="tl-m">' +
+        '<div class="tl-r"><b class="mono ap">' + esc(e.o || '—') + '</b><span class="arw">→</span><b class="mono ap">' + esc(e.dst || '—') + '</b>' +
+          '<span class="st ' + st.cls + '">' + esc(st.text) + '</span></div>' +
+        '<div class="tl-s">' + (e.reg ? '<b class="mono fno">' + esc(e.reg) + '</b>' : '機材未確定') +
+          ' ・ ' + esc(aptName(e.o)) + '→' + esc(aptName(e.dst)) + (q ? ' ・ ' + esc(q.hm) + '着' : '') + '</div>' +
+      '</div>' +
+    '</button>';
+  }
+
+  function histCards(list, limit) {
+    return histDayGroups(list, limit).map(function (d) {
+      return '<div class="tl-day"><span class="mono">' + esc(d.md) + '</span><span class="wd">(' + esc(d.wd) + ')</span>' +
+        '<span class="n">' + d.items.length + '便</span></div>' +
+        d.items.map(histRowAircraft).join('');
+    }).join('');
+  }
+
+  function histSummaryHtml(s) {
+    var h = '<div class="hist-sum">' +
+      '<div class="hs"><b>' + s.n + '</b><span>便</span></div>' +
+      '<div class="hs"><b>' + s.apts.length + '</b><span>空港</span></div>' +
+      '<div class="hs"><b>' + (s.avg == null ? '—' : (s.avg > 0 ? '+' : '') + s.avg + '<small>分</small>') + '</b><span>平均遅延</span></div>' +
+      '<div class="hs"><b class="mono">' + esc(s.span) + '</b><span>期間</span></div>' +
+    '</div>';
+    if (s.routes.length) {
+      h += '<div class="hist-routes">' + s.routes.map(function (r) {
+        return '<span class="rchip"><b class="mono">' + esc(r.r) + '</b> ' + r.n + '便</span>';
+      }).join('') + '</div>';
+    }
+    if (s.apts.length) {
+      h += '<div class="hist-apts">' + s.apts.map(function (a) {
+        return '<span class="achip"><b class="mono">' + esc(a) + '</b>' + esc(aptName(a)) + '</span>';
+      }).join('') + '</div>';
+    }
+    return h;
+  }
+
+  function histCardAircraft(key, reg, list, at) {
+    var s = histStats(list);
+    var h = '<div class="card hist" id="histCard">' +
+      '<div class="hist-h"><h3>これまでの飛行履歴 <span class="mono hreg">' + esc(reg || key) + '</span></h3>' +
+      (list.length ? '<span class="pill">直近7日 ・ ' + s.n + '便</span>' : '') + '</div>';
+
+    if (!list.length) {
+      h += '<p class="hmsg">直近7日のフライトが見つかりませんでした（運休・整備中・データ未登録）。' +
+        'それ以前の履歴は下の FR24 / FlightAware で確認できます。</p>';
+    } else {
+      h += histSummaryHtml(s);
+      h += '<div class="tl" id="histTl">' + histCards(list, 30) + '</div>';
+      if (list.length > 30) {
+        h += '<button class="hist-more" id="histShowAll">残り ' + (list.length - 30) + ' 便を表示</button>';
+      }
+      h += '<div class="hist-at">取得 ' + esc(fmtAt(at)) + ' ・ Flightradar24 公開データ（直近7日・最大100便）</div>';
+    }
+
+    h += '<div class="btnrow" style="margin-top:10px">' +
+        '<a class="btn" href="' + U.fr24Reg(reg || key) + '" target="_blank" rel="noopener">もっと過去（FR24）</a>' +
+        '<a class="btn" href="' + U.faReg(reg || key) + '" target="_blank" rel="noopener">FlightAware 履歴</a>' +
+        '<button class="btn wide" id="histRefresh">履歴を再取得</button>' +
+      '</div>' +
+      '<p class="hist-note">出発地→到着地・便名・日時・状態は Flightradar24 の公開データから直接取得。' +
+      '無料で取れるのは<b>直近7日・最大100便</b>までで、それ以前の長期履歴は FR24 機体ページ（月別カレンダー）と FlightAware で確認できます。</p>' +
+      '</div>';
+    return h;
+  }
+
+  function histCardFlight(flt, list, at) {
+    var regs = {}, delays = [];
+    list.forEach(function (e) {
+      if (e.reg) regs[e.reg] = (regs[e.reg] || 0) + 1;
+      if (/cancel/i.test(e.st)) return;
+      if (e.rdep && e.dep) {
+        var m = Math.round((e.rdep - e.dep) / 60);
+        if (Math.abs(m) < 600) delays.push(m);
+      }
+    });
+    var regList = Object.keys(regs).sort(function (a, b) { return regs[b] - regs[a]; });
+    var avg = delays.length ? Math.round(delays.reduce(function (a, b) { return a + b; }, 0) / delays.length) : null;
+    var h = '<div class="card hist" id="histCard">' +
+      '<div class="hist-h"><h3>便 <span class="mono hreg">' + esc(flt) + '</span> の運航履歴</h3>' +
+      (list.length ? '<span class="pill">直近7日 ・ ' + list.length + '便</span>' : '') + '</div>';
+
+    if (!list.length) {
+      h += '<p class="hmsg">直近7日の運航記録が見つかりませんでした。下の FR24 便ページでご確認ください。</p>';
+    } else {
+      h += '<div class="hist-sum">' +
+        '<div class="hs"><b>' + list.length + '</b><span>便</span></div>' +
+        '<div class="hs"><b>' + regList.length + '</b><span>使用機材</span></div>' +
+        '<div class="hs"><b>' + (avg == null ? '—' : (avg > 0 ? '+' : '') + avg + '<small>分</small>') + '</b><span>平均遅延</span></div>' +
+        '<div class="hs"><b class="mono">' + esc(list.length ? (jst(list[list.length - 1].dep || list[list.length - 1].arr) || {}).md + '〜' + (jst(list[0].dep || list[0].arr) || {}).md : '—') + '</b><span>期間</span></div>' +
+      '</div>';
+      if (regList.length) {
+        h += '<div class="hist-routes">' + regList.slice(0, 6).map(function (r) {
+          return '<button class="rchip reg-jump" data-reg="' + esc(r) + '"><b class="mono">' + esc(r) + '</b> ' + regs[r] + '便</button>';
+        }).join('') + '</div>';
+        h += '<p class="hist-note" style="margin:6px 0 0">機体をタップすると、その機体の飛行履歴（どこからどこへ飛んだか）を開きます。</p>';
+      }
+      h += '<div class="tl">' + histDayGroups(list, 30).map(function (d) {
+        return '<div class="tl-day"><span class="mono">' + esc(d.md) + '</span><span class="wd">(' + esc(d.wd) + ')</span>' +
+          '<span class="n">' + d.items.length + '便</span></div>' + d.items.map(histRowFlight).join('');
+      }).join('') + '</div>';
+      h += '<div class="hist-at">取得 ' + esc(fmtAt(at)) + ' ・ Flightradar24 公開データ（直近7日）</div>';
+    }
+    h += '<p class="hist-note">便名の履歴は「その便名を最近どの機材が飛んだか」の記録です。7日より前は FR24 便ページで確認できます。</p></div>';
+    return h;
+  }
+
+  function histSkeleton(msg) {
+    return '<div class="card hist"><div class="hist-h"><h3>' + esc(msg) + '</h3></div>' +
+      '<div class="skel" style="height:28px;margin-top:6px"></div>' +
+      '<div class="skel" style="height:44px"></div><div class="skel" style="height:44px"></div></div>';
+  }
+
+  function histErrorCard(reg, what) {
+    return '<div class="card hist" id="histCard"><div class="hist-h"><h3>飛行履歴を取得できませんでした</h3>' +
+      '<span class="pill link">OFFLINE</span></div>' +
+      '<p class="hmsg">Flightradar24 の公開データに接続できませんでした（通信制限・回線・一時的な遮断の可能性）。' +
+      what + 'の履歴は下のリンクから直接確認できます。</p>' +
+      '<div class="btnrow" style="margin-top:10px">' +
+        '<a class="btn" href="' + U.fr24Reg(reg) + '" target="_blank" rel="noopener">FR24 機体ページ</a>' +
+        '<a class="btn" href="' + U.faReg(reg) + '" target="_blank" rel="noopener">FlightAware 履歴</a>' +
+        '<button class="btn wide" id="histRefresh">もう一度取得</button>' +
+      '</div></div>';
+  }
+
+  function wireHist(slot) {
+    var all = slot.querySelector('#histShowAll');
+    if (all) all.onclick = function () {
+      var tl = slot.querySelector('#histTl');
+      var at = slot.querySelector('.hist-at');
+      var s = slot._list || [];
+      tl.innerHTML = histCards(s, HIST_LIMIT);
+      all.remove();
+      if (at) at.textContent = at.textContent;
+    };
+    var rf = slot.querySelector('#histRefresh');
+    if (rf) rf.onclick = function () { histLoad(slot, slot._mode, slot._key, true); };
+    Array.prototype.forEach.call(slot.querySelectorAll('.tl-btn[data-reg], .reg-jump'), function (b) {
+      b.onclick = function () {
+        var r = b.getAttribute('data-reg');
+        if (!r) return;
+        $('#acInput').value = r;
+        doAircraftSearch(r);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
+    });
+  }
+
+  // slot に履歴カードを描く（mode: 'reg' | 'flight'）
+  function histLoad(slot, mode, key, force) {
+    if (!slot) return;
+    slot._mode = mode; slot._key = key;
+    var ck = mode + ':' + key;
+    var cache = force ? null : histGet(ck);
+    var render = function (list, at) {
+      if (!document.body.contains(slot)) return;
+      slot._list = list;
+      slot.innerHTML = (mode === 'reg') ? histCardAircraft(key, slot._reg || key, list, at)
+                                        : histCardFlight(key, list, at);
+      wireHist(slot);
+    };
+    if (cache) {
+      render(cache.list, cache.at);
+      if (Date.now() - cache.at < HIST_TTL) return;
+    } else {
+      slot.innerHTML = histSkeleton(mode === 'reg' ? 'これまでの飛行履歴を取得中…' : '運航履歴を取得中…');
+    }
+    fr24List(key, mode === 'reg' ? 'reg' : 'flight').then(function (res) {
+      var list = normFlights(res.data);
+      histPut(ck, list);
+      // 空でも「取れた」ことは覚えておく（毎回叩かない）
+      render(list, Date.now());
+      renderFavHist();
+    }).catch(function () {
+      if (!cache && document.body.contains(slot)) {
+        slot.innerHTML = histErrorCard(mode === 'reg' ? (slot._reg || key) : key, mode === 'reg' ? '機体' : '便');
+        wireHist(slot);
+      }
+    });
+  }
+
+  function adsbAircraft(key) {
+    return fetch('https://api.adsbdb.com/v0/aircraft/' + encodeURIComponent(key), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return (j && j.response && j.response.aircraft) || null; })
+      .catch(function () { return null; });
   }
 
   function doAircraftSearch(v) {
@@ -499,24 +857,26 @@
     var q = parseQuery(v);
     state.acQuery = v;
     if (!q) { host.innerHTML = ''; return; }
-    host.innerHTML = '<div class="card"><div class="skel" style="height:34px"></div></div>';
+    if (q.type === 'unknown') {
+      host.innerHTML = '<div class="card"><h3>検索できませんでした</h3><p class="sub" style="margin:0">' +
+        'レジ番（例 JA01XJ / JA27MC / N12345）、ICAO24 の6桁hex（例 8406E8）、便名（例 NH985 / MM309）のいずれかを入れてください。</p></div>';
+      return;
+    }
+    host.innerHTML = histSkeleton('検索しています…');
 
-    var jobs = [];
-    var reg = q.type === 'reg' ? q.reg : (q.type === 'flight' ? q.flight : '');
+    var acKey = (q.type === 'reg') ? q.reg : (q.type === 'hex' ? q.hex : '');
     var callsign = q.type === 'flight' ? q.callsign : '';
 
-    var pAc = (q.type === 'reg')
-      ? fetch('https://api.adsbdb.com/v0/aircraft/' + encodeURIComponent(q.reg)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-      : Promise.resolve(null);
-
-    var pRoute = (callsign || (q.type === 'reg' ? '' : ''))
+    var pAc = acKey ? adsbAircraft(acKey) : Promise.resolve(null);
+    var pRoute = callsign
       ? fetch('https://api.adsbdb.com/v0/callsign/' + encodeURIComponent(callsign)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
       : Promise.resolve(null);
 
     Promise.all([pAc, pRoute]).then(function (res) {
-      var ac = res[0] && res[0].response && res[0].response.aircraft ? res[0].response.aircraft : null;
+      var ac = res[0];
       var route = res[1] && res[1].response && res[1].response.flightroute ? res[1].response.flightroute : null;
       var air = q.type === 'flight' ? window.FO_AIRLINE_MAP[q.iata] : null;
+      var reg = (ac && ac.registration) || (q.type === 'reg' ? q.reg : '');
       var html = '';
 
       if (q.type === 'flight' && air) {
@@ -524,31 +884,32 @@
           '<div class="kv">' +
             '<dt>航空会社</dt><dd>' + esc(air[2]) + '（' + esc(air[0]) + ' / ' + esc(air[1]) + '）</dd>' +
             '<dt>ADS-B コールサイン</dt><dd class="mono">' + esc(q.callsign) + '</dd>' +
-            (route ? '<dt>運航区間</dt><dd>' + esc(route.callsign_icao || q.callsign) +
-              (route.origin && route.origin.iata_code ? '：' + esc(route.origin.municipality || route.origin.name || '') + '（' + esc(route.origin.iata_code) + '）→ ' : '') +
-              (route.destination && route.destination.iata_code ? esc(route.destination.municipality || route.destination.name || '') + '（' + esc(route.destination.iata_code) + '）' : '') + '</dd>' : '') +
+            (route ? '<dt>現在の運航区間</dt><dd>' + esc((route.origin && route.origin.iata_code) || '') + ' → ' + esc((route.destination && route.destination.iata_code) || '') + '</dd>' : '') +
           '</div>' +
-          (route ? '' : '<p class="sub" style="margin-top:8px">※ 現在 ADS-B で受信できていない便は区間が引けません（運航時間外・圏外）。下の外部リンクでご確認ください。</p>') +
+          (route ? '' : '<p class="sub" style="margin-top:8px">※ いま ADS-B で受信できていない便は現在の区間が引けません（運航時間外・圏外）。下の履歴で最近の運航を確認できます。</p>') +
           '</div>';
       }
 
       if (ac) {
-        html += '<div class="card"><h3>機体 ' + esc(ac.registration || reg) + '</h3>' +
+        html += '<div class="card"><h3>機体 ' + esc(ac.registration || acKey) + '</h3>' +
           '<div class="kv">' +
             '<dt>型式</dt><dd>' + esc([ac.icao_type, ac.manufacturer, ac.type].filter(Boolean).join(' / ') || '—') + '</dd>' +
             '<dt>登録</dt><dd class="mono">' + esc(ac.registration || '—') + '</dd>' +
-            '<dt>ICAO24</dt><dd class="mono">' + esc(ac.mode_s || '—') + '</dd>' +
+            '<dt>ICAO24</dt><dd class="mono">' + esc(ac.mode_s || (q.type === 'hex' ? q.hex : '—')) + '</dd>' +
             '<dt>運航者</dt><dd>' + esc(ac.registered_owner || '—') + (ac.registered_owner_country_name ? '（' + esc(ac.registered_owner_country_name) + '）' : '') + '</dd>' +
           '</div></div>';
-      } else if (q.type === 'reg') {
-        html += '<div class="card"><h3>機体 ' + esc(q.reg) + '</h3><p class="sub" style="margin:0">' +
-          '登録データベース（adsbdb）に該当がありませんでした。外部リンクで機体を確認できます。</p></div>';
+      } else if (q.type === 'reg' || q.type === 'hex') {
+        html += '<div class="card"><h3>機体 ' + esc(acKey) + '</h3><p class="sub" style="margin:0">' +
+          '登録データベース（adsbdb）に該当がありませんでした。それでも履歴は下で照会します。</p></div>';
       }
 
+      // ▼ ここに飛行履歴タイムラインが入る
+      html += '<div id="histSlot"></div>';
+
       // ボード横断（羽田・成田・福岡）
-      var found = crossBoard(reg || q.flight || '');
+      var found = crossBoard(reg || q.flight || acKey || '');
       if (found.length) {
-        html += '<div class="card"><h3>本日のボード横断 ' + esc((reg || q.flight)) + '</h3>';
+        html += '<div class="card"><h3>本日のボード横断 ' + esc(reg || q.flight) + '</h3>';
         found.slice(0, 12).forEach(function (f) {
           html += '<div class="kv" style="grid-template-columns:52px 1fr;border-top:1px solid #16233a;padding-top:6px">' +
             '<dt class="mono" style="color:var(--cyan);font-size:12px">' + esc(f.iata) + '</dt>' +
@@ -560,13 +921,14 @@
 
       // 外部リンク
       var lk = '';
-      if (q.type === 'reg') {
-        lk += '<a class="linkbtn" href="' + U.fr24Reg(q.reg) + '" target="_blank" rel="noopener"><b>FR24 機体ページ</b><span>当日の全フライト＝機材繰り</span></a>';
-        lk += '<a class="linkbtn" href="' + U.faReg(q.reg) + '" target="_blank" rel="noopener"><b>FlightAware 機体</b><span>運航履歴・登録情報</span></a>';
-        lk += '<a class="linkbtn" href="' + U.adsbx(q.reg) + '" target="_blank" rel="noopener"><b>ADS-B Exchange</b><span>ライブ位置（レジ指定）</span></a>';
-        lk += '<a class="linkbtn" href="' + U.airfleets(q.reg) + '" target="_blank" rel="noopener"><b>Airfleets</b><span>運用歴・製造番号</span></a>';
-        lk += '<a class="linkbtn" href="' + U.planespotters(q.reg) + '" target="_blank" rel="noopener"><b>Planespotters</b><span>機体写真・型式</span></a>';
-        lk += '<a class="linkbtn" href="' + U.jetphotos(q.reg) + '" target="_blank" rel="noopener"><b>JetPhotos</b><span>写真（レジ検索）</span></a>';
+      if (q.type === 'reg' || q.type === 'hex') {
+        var rk = reg || acKey;
+        lk += '<a class="linkbtn" href="' + U.fr24Reg(rk) + '" target="_blank" rel="noopener"><b>FR24 機体ページ</b><span>全期間の運航履歴（月別）</span></a>';
+        lk += '<a class="linkbtn" href="' + U.faReg(rk) + '" target="_blank" rel="noopener"><b>FlightAware 機体</b><span>運航履歴・登録情報</span></a>';
+        lk += '<a class="linkbtn" href="' + U.adsbx(rk) + '" target="_blank" rel="noopener"><b>ADS-B Exchange</b><span>ライブ位置（レジ指定）</span></a>';
+        lk += '<a class="linkbtn" href="' + U.planespotters(rk) + '" target="_blank" rel="noopener"><b>Planespotters</b><span>機体写真・型式</span></a>';
+        lk += '<a class="linkbtn" href="' + U.airfleets(rk) + '" target="_blank" rel="noopener"><b>Airfleets</b><span>運用歴・製造番号</span></a>';
+        lk += '<a class="linkbtn" href="' + U.jetphotos(rk) + '" target="_blank" rel="noopener"><b>JetPhotos</b><span>写真（レジ検索）</span></a>';
       } else if (q.type === 'flight') {
         lk += '<a class="linkbtn" href="' + U.fr24Flight(q.flight) + '" target="_blank" rel="noopener"><b>FR24 便ページ</b><span>使用機材・位置・履歴</span></a>';
         lk += '<a class="linkbtn" href="' + U.faFlight(q.flight) + '" target="_blank" rel="noopener"><b>FlightAware 便</b><span>運航状況・遅延</span></a>';
@@ -578,17 +940,61 @@
 
       if (lk) html += '<div class="card"><h3>機材繰り・運航状況を開く</h3><div class="linkgrid" style="margin-top:4px">' + lk + '</div></div>';
 
-      if (q.type === 'unknown') {
-        html = '<div class="card"><h3>検索できませんでした</h3><p class="sub" style="margin:0">' +
-          'レジ番（例 JA01XJ / JA27MC）または便名（例 NH985 / MM309）を入れてください。</p></div>';
-      }
-
+      var label = (q.type === 'reg' || q.type === 'hex') ? (reg || acKey) : q.flight;
       html += '<div class="btnrow" style="margin-top:10px"><button class="btn violet wide" id="favAcBtn">' +
-        esc((q.type === 'reg' ? q.reg : q.flight) || v) + ' をよく見る機体に登録</button></div>';
+        esc(label || v) + ' をよく見る機体に登録</button></div>';
 
       host.innerHTML = html;
       var fb = $('#favAcBtn');
-      if (fb) fb.onclick = function () { addFav(q.type === 'reg' ? q.reg : q.flight); toast('登録しました'); };
+      if (fb) fb.onclick = function () { addFav(label); toast('登録しました'); };
+
+      var slot = $('#histSlot');
+      if (slot && (q.type === 'reg' || q.type === 'hex')) {
+        slot._reg = reg || '';
+        histLoad(slot, 'reg', reg || acKey, false);
+      } else if (slot && q.type === 'flight') {
+        histLoad(slot, 'flight', q.flight, false);
+      }
+    });
+  }
+
+  /* ---------- お気に入り機体の履歴一覧 ---------- */
+  function renderFavHist() {
+    var host = $('#acFavHist');
+    if (!host) return;
+    if (!state.favCrew.length) { host.innerHTML = ''; return; }
+    var rows = '';
+    state.favCrew.forEach(function (c) {
+      var pq = parseQuery(c);
+      var mode = (pq && pq.type === 'flight') ? 'flight' : 'reg';
+      var cache = histGet(mode + ':' + c);
+      var last = cache && cache.list && cache.list[0];
+      var sub = '';
+      if (last) {
+        var p = jst(last.dep || last.arr);
+        sub = '<span class="mono">' + esc(last.o) + '→' + esc(last.dst) + '</span> ' +
+          esc(p ? p.md + ' ' + p.hm : '') +
+          (mode === 'flight' && last.reg ? ' ・ <span class="mono">' + esc(last.reg) + '</span>' : '') +
+          (mode === 'reg' && last.flt ? ' ・ <span class="mono">' + esc(last.flt) + '</span>' : '');
+      } else {
+        sub = (mode === 'flight') ? 'この便名の運航履歴を見る' : '飛行履歴を見る（直近7日）';
+      }
+      rows += '<button class="frow" data-q="' + esc(c) + '">' +
+        '<span class="fq mono">' + esc(c) + '</span>' +
+        '<span class="fs">' + sub + '</span>' +
+        '<span class="go">›</span></button>';
+    });
+    host.innerHTML = '<div class="card"><div class="hist-h"><h3>お気に入りの飛行履歴</h3>' +
+      '<span class="pill">' + state.favCrew.length + '件</span></div>' +
+      '<div class="favlist">' + rows + '</div>' +
+      '<p class="hist-note">タップすると、その機体・便の履歴（どこからどこへ飛んだか）を開きます。</p></div>';
+    Array.prototype.forEach.call(host.querySelectorAll('.frow'), function (b) {
+      b.onclick = function () {
+        var qq = b.getAttribute('data-q');
+        $('#acInput').value = qq;
+        doAircraftSearch(qq);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      };
     });
   }
 
@@ -680,6 +1086,7 @@
       if (v === 'links') setLive('link', 'HUB');
     }
     if (v === 'links') renderLinks();
+    if (v === 'aircraft') renderFavHist();
     if (v === 'aircraft' && !state.acQuery) {
       var i = $('#acInput');
       if (i && !i.value && state.favCrew.length === 0) i.placeholder = 'JA01XJ ・ NH985';
@@ -732,6 +1139,7 @@
       if (e.key === 'Enter') { e.preventDefault(); $('#acInput').blur(); doAircraftSearch($('#acInput').value); }
     });
     renderFavCrew();
+    renderFavHist();
 
     // リンク集
     $('#linkFilter').oninput = function (e) { state.linkFilter = e.target.value; renderLinks(); };
